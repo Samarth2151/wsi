@@ -22,6 +22,12 @@ const navigationItems: NavigationItem[] = [
   { label: 'Users', to: '/admin/users', allowedRoles: ['ADMIN'] },
 ];
 
+const roleLabels: Record<UserRole, string> = {
+  ADMIN: 'Admin',
+  AUDITOR: 'Auditor',
+  TECHNICIAN: 'Technician',
+};
+
 export function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -90,8 +96,12 @@ export function Navbar() {
         >
           <div className="account-identity">
             <span className="account-username">{user.username}</span>
-            <span className={`role-badge role-badge--${user.role.toLowerCase()}`}>
-              {user.role}
+            <span
+              aria-label={`${roleLabels[user.role]} role`}
+              className={`role-badge role-badge--${user.role.toLowerCase()}`}
+              title={`${roleLabels[user.role]} role`}
+            >
+              {roleLabels[user.role]}
             </span>
           </div>
           <button className="logout-button" type="button" onClick={handleLogout}>

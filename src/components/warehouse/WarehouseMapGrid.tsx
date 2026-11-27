@@ -1,12 +1,18 @@
+import { ArrowLeftRight } from 'lucide-react';
+
 import type { StorageLocation } from '../../types/wms';
 
 const COLUMNS = ['A', 'B', 'C', 'D', 'E'] as const;
 const ROWS = [1, 2, 3, 4, 5] as const;
+const EMPTY_CODES: ReadonlySet<string> = new Set();
 
 interface WarehouseMapGridProps {
   locations: StorageLocation[];
   selectedCode: string | null;
   disabled?: boolean;
+  highlightedCodes?: ReadonlySet<string>;
+  dimmedCodes?: ReadonlySet<string>;
+  recentlyChangedCodes?: ReadonlySet<string>;
   onSelect: (code: string) => void;
 }
 
@@ -26,6 +32,9 @@ export function WarehouseMapGrid({
   locations,
   selectedCode,
   disabled = false,
+  highlightedCodes = EMPTY_CODES,
+  dimmedCodes = EMPTY_CODES,
+  recentlyChangedCodes = EMPTY_CODES,
   onSelect,
 }: WarehouseMapGridProps) {
   const locationsByCode = new Map(
@@ -68,6 +77,9 @@ export function WarehouseMapGrid({
                           'slot-button',
                           `slot-button--${location.status.toLowerCase()}`,
                           selectedCode === code ? 'is-selected' : '',
+                          highlightedCodes.has(code) ? 'is-highlighted' : '',
+                          dimmedCodes.has(code) ? 'is-dimmed' : '',
+                          recentlyChangedCodes.has(code) ? 'is-changing' : '',
                         ]
                           .filter(Boolean)
                           .join(' ')}
@@ -78,7 +90,10 @@ export function WarehouseMapGrid({
                       >
                         <span className="slot-code">{code}</span>
                         {location.location_type === 'TRANSFER' ? (
-                          <span className="slot-caption">Transfer Point</span>
+                          <span className="slot-transfer-caption">
+                            <ArrowLeftRight size={11} aria-hidden="true" />
+                            <span className="slot-caption">Transfer Point</span>
+                          </span>
                         ) : location.status === 'OCCUPIED' && location.pallet ? (
                           <>
                             <span className="slot-pallet-number">

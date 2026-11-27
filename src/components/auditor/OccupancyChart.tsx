@@ -1,3 +1,5 @@
+import { BarChart3 } from 'lucide-react';
+
 import type { OccupancyHistoryPoint } from '../../types/wms';
 
 interface OccupancyChartProps {
@@ -43,7 +45,15 @@ export function OccupancyChart({ history }: OccupancyChartProps) {
       </div>
 
       {history.length === 0 ? (
-        <p className="auditor-empty-state">No occupancy history is available yet.</p>
+        <div className="history-empty-state" role="status">
+          <span className="history-empty-mark" aria-hidden="true">
+            <BarChart3 size={19} />
+          </span>
+          <div>
+            <h3>No occupancy history yet</h3>
+            <p>Daily snapshots will appear here as warehouse occupancy is recorded.</p>
+          </div>
+        </div>
       ) : (
         <>
           <div className="occupancy-chart-scroll">

@@ -1,3 +1,5 @@
+import { ArrowLeftRight } from 'lucide-react';
+
 import type { LoadPalletPayload } from '../../api/warehouse';
 import type { StorageLocation } from '../../types/wms';
 import { LoadPalletForm } from './LoadPalletForm';
@@ -39,10 +41,16 @@ export function SlotInspector({
         </p>
       ) : location.location_type === 'TRANSFER' ? (
         <div className="transfer-notice">
-          <span className="transfer-notice-mark" aria-hidden="true">A1</span>
+          <span className="transfer-notice-mark" aria-hidden="true">
+            <ArrowLeftRight size={18} strokeWidth={2.2} />
+          </span>
           <div>
+            <span className="transfer-notice-label">A1 · TRANSFER POINT</span>
             <h3>Shuttle transfer point</h3>
-            <p>A1 is used for shuttle handoff and cannot store pallets.</p>
+            <p>
+              A1 is used for shuttle handoff and cannot store pallets. Pallet loading is disabled on
+              transfer points.
+            </p>
           </div>
         </div>
       ) : location.status === 'OCCUPIED' && location.pallet ? (

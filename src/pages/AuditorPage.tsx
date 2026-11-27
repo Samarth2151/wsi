@@ -144,9 +144,13 @@ export function AuditorPage() {
                 </table>
               </div>
             ) : (
-              <p className="auditor-empty-state" data-testid="inventory-empty-state">
+              <p
+                className="auditor-empty-state"
+                data-testid="inventory-empty-state"
+                role="status"
+              >
                 {data.pallets.length === 0
-                  ? 'No pallets are currently stored.'
+                  ? 'No active pallets are stored yet. Inventory will appear when stock is loaded.'
                   : 'No pallets match your search.'}
               </p>
             )}

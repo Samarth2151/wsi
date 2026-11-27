@@ -1,4 +1,4 @@
-import { CheckCircle2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ApiError } from '../api/client';
@@ -8,6 +8,7 @@ import {
   unloadPallet,
   type LoadPalletPayload,
 } from '../api/warehouse';
+import { FilterPills } from '../components/FilterPills';
 import { PageHeading } from '../components/PageHeading';
 import { SlotInspector } from '../components/warehouse/SlotInspector';
 import { WarehouseMapGrid } from '../components/warehouse/WarehouseMapGrid';
@@ -17,6 +18,14 @@ import { useAuth } from '../context/AuthContext';
 import type { WarehouseStateResponse } from '../types/wms';
 
 const REFRESH_INTERVAL_MS = 3000;
+const SLOT_FILTERS = [
+  { value: 'All', label: 'All' },
+  { value: 'Available', label: 'Available' },
+  { value: 'Occupied', label: 'Occupied' },
+  { value: 'Transfer Point', label: 'Transfer Point' },
+] as const;
+
+type SlotFilter = (typeof SLOT_FILTERS)[number]['value'];
 
 function getActionErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
@@ -35,9 +44,15 @@ export function MapPage() {
   const { user } = useAuth();
   const [warehouse, setWarehouse] = useState<WarehouseStateResponse | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [secondsSinceUpdate, setSecondsSinceUpdate] = useState(0);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [slotFilter, setSlotFilter] = useState<SlotFilter>('All');
+  const [mapSearch, setMapSearch] = useState('');
+  const [recentlyChangedCodes, setRecentlyChangedCodes] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [isMutating, setIsMutating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -45,6 +60,8 @@ export function MapPage() {
   const mutationInFlightRef = useRef(false);
   const mountedRef = useRef(false);
   const requestVersionRef = useRef(0);
+  const previousSlotStatesRef = useRef<Map<string, string> | null>(null);
+  const changedSlotTimeoutRef = useRef<number | null>(null);
 
   const refreshWarehouse = useCallback(async () => {
     if (
@@ -109,6 +126,66 @@ export function MapPage() {
     };
   }, [refreshWarehouse]);
 
+  useEffect(() => {
+    if (!lastUpdated) {
+      setSecondsSinceUpdate(0);
+      return;
+    }
+
+    const updateAge = () => {
+      setSecondsSinceUpdate(
+        Math.max(0, Math.floor((Date.now() - lastUpdated.getTime()) / 1000)),
+      );
+    };
+
+    updateAge();
+    const intervalId = window.setInterval(updateAge, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [lastUpdated]);
+
+  useEffect(() => {
+    if (!warehouse) return;
+
+    const nextStates = new Map(
+      warehouse.locations.map((location) => [
+        location.code,
+        `${location.status}:${location.pallet?.pallet_number ?? ''}`,
+      ]),
+    );
+    const previousStates = previousSlotStatesRef.current;
+
+    if (previousStates) {
+      const changedCodes = new Set<string>();
+      for (const [code, state] of nextStates) {
+        if (previousStates.has(code) && previousStates.get(code) !== state) {
+          changedCodes.add(code);
+        }
+      }
+
+      if (changedCodes.size > 0) {
+        setRecentlyChangedCodes(changedCodes);
+        if (changedSlotTimeoutRef.current !== null) {
+          window.clearTimeout(changedSlotTimeoutRef.current);
+        }
+        changedSlotTimeoutRef.current = window.setTimeout(() => {
+          setRecentlyChangedCodes(new Set());
+          changedSlotTimeoutRef.current = null;
+        }, 1800);
+      }
+    }
+
+    previousSlotStatesRef.current = nextStates;
+  }, [warehouse]);
+
+  useEffect(
+    () => () => {
+      if (changedSlotTimeoutRef.current !== null) {
+        window.clearTimeout(changedSlotTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
   const runMutation = useCallback(
     async (request: () => Promise<unknown>, successText: string): Promise<boolean> => {
       if (mutationInFlightRef.current) return false;
@@ -170,6 +247,44 @@ export function MapPage() {
     [selectedCode, warehouse],
   );
 
+  const normalizedSearch = mapSearch.trim().toLowerCase();
+  const isHighlightingSlots = slotFilter !== 'All' || normalizedSearch.length > 0;
+  const highlightedCodes = useMemo(() => {
+    if (!warehouse || !isHighlightingSlots) return new Set<string>();
+
+    return new Set(
+      warehouse.locations
+        .filter((location) => {
+          const matchesFilter =
+            slotFilter === 'All' ||
+            (slotFilter === 'Available' && location.status === 'FREE') ||
+            (slotFilter === 'Occupied' && location.status === 'OCCUPIED') ||
+            (slotFilter === 'Transfer Point' && location.location_type === 'TRANSFER');
+          const searchableText = [
+            location.code,
+            location.pallet?.pallet_number ?? '',
+            location.pallet?.barcode ?? '',
+            location.pallet?.item_name ?? '',
+          ]
+            .join(' ')
+            .toLowerCase();
+          const matchesSearch = !normalizedSearch || searchableText.includes(normalizedSearch);
+
+          return matchesFilter && matchesSearch;
+        })
+        .map((location) => location.code),
+    );
+  }, [isHighlightingSlots, normalizedSearch, slotFilter, warehouse]);
+
+  const dimmedCodes = useMemo(() => {
+    if (!warehouse || !isHighlightingSlots) return new Set<string>();
+    return new Set(
+      warehouse.locations
+        .filter((location) => !highlightedCodes.has(location.code))
+        .map((location) => location.code),
+    );
+  }, [highlightedCodes, isHighlightingSlots, warehouse]);
+
   const handleSelectSlot = (code: string) => {
     setSelectedCode(code);
     setActionError(null);
@@ -195,14 +310,23 @@ export function MapPage() {
       />
 
       <div className="warehouse-live-toolbar">
-        <div className="live-sync-status" aria-live="off" role="status">
+        <div
+          aria-label={
+            lastUpdatedText
+              ? `Live sync active. Updated ${secondsSinceUpdate} seconds ago at ${lastUpdatedText}.`
+              : 'Live sync active. Waiting for first update.'
+          }
+          aria-live="off"
+          className="live-sync-status"
+          role="status"
+        >
           <span
             aria-hidden="true"
             className={`live-sync-dot${isRefreshing ? ' is-syncing' : ''}`}
           />
           <span>
             {lastUpdatedText
-              ? `Live sync active · Last updated ${lastUpdatedText}`
+              ? `Live sync active · updated ${secondsSinceUpdate}s ago`
               : 'Live sync active · Waiting for first update'}
           </span>
         </div>
@@ -244,10 +368,38 @@ export function MapPage() {
                   <p>Select a slot to inspect its status and pallet actions.</p>
                 </div>
               </header>
+              <div className="warehouse-map-controls">
+                <FilterPills
+                  label="Filter warehouse locations"
+                  onChange={setSlotFilter}
+                  options={SLOT_FILTERS}
+                  value={slotFilter}
+                />
+                <div className="warehouse-map-search">
+                  <Search size={15} aria-hidden="true" />
+                  <input
+                    aria-label="Search locations and pallets"
+                    autoComplete="off"
+                    id="warehouse-map-search"
+                    onChange={(event) => setMapSearch(event.target.value)}
+                    placeholder="Find a slot or pallet"
+                    type="search"
+                    value={mapSearch}
+                  />
+                </div>
+              </div>
+              {isHighlightingSlots && highlightedCodes.size === 0 && (
+                <p className="warehouse-map-no-matches" role="status">
+                  No locations match these filters.
+                </p>
+              )}
               <WarehouseMapGrid
                 disabled={isMutating}
+                dimmedCodes={dimmedCodes}
+                highlightedCodes={highlightedCodes}
                 locations={warehouse.locations}
                 onSelect={handleSelectSlot}
+                recentlyChangedCodes={recentlyChangedCodes}
                 selectedCode={selectedCode}
               />
             </section>
