@@ -7,8 +7,8 @@ const ACCESS_TOKEN_KEY = 'wms_access_token';
 
 export function getTestApiBaseUrl(): string {
   const configuredUrl =
-    process.env.VITE_API_BASE_URL ||
-    process.env.API_BASE_URL ||
+    process.env.API_BASE_URL ??
+    process.env.VITE_API_BASE_URL ??
     'http://127.0.0.1:8000';
   return configuredUrl.replace(/\/+$/, '');
 }
