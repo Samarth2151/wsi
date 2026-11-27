@@ -6,11 +6,15 @@ import type { WarehouseStateResponse } from '../../src/types/wms';
 const ACCESS_TOKEN_KEY = 'wms_access_token';
 
 export function getTestApiBaseUrl(): string {
-  const configuredUrl =
-    process.env.API_BASE_URL ??
-    process.env.VITE_API_BASE_URL ??
-    'http://127.0.0.1:8000';
-  return configuredUrl.replace(/\/+$/, '');
+  const configuredUrl = process.env.API_BASE_URL || process.env.VITE_API_BASE_URL;
+  const uiBaseUrl = process.env.UI_BASE_URL?.replace(/\/+$/, '');
+  const inferredUrl =
+    uiBaseUrl === 'https://wsi-wine.vercel.app'
+      ? 'https://wms-api-y8iy.onrender.com'
+      : 'http://127.0.0.1:8000';
+
+  const apiBaseUrl = configuredUrl || inferredUrl;
+  return apiBaseUrl.replace(/\/+$/, '');
 }
 
 async function getAuthorizationHeaders(page: Page): Promise<Record<string, string>> {
