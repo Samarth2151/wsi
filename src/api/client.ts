@@ -156,8 +156,11 @@ async function request<TResponse>(
   return (await response.json()) as TResponse;
 }
 
-export function apiGet<TResponse>(path: string): Promise<TResponse> {
-  return request<TResponse>(path, { method: 'GET' });
+export function apiGet<TResponse>(
+  path: string,
+  options: Pick<RequestInit, 'signal'> = {},
+): Promise<TResponse> {
+  return request<TResponse>(path, { method: 'GET', signal: options.signal });
 }
 
 export function apiPost<TResponse, TBody = unknown>(
