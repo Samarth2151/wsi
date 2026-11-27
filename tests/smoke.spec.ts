@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('home page shows the warehouse app shell without browser errors', async ({
-  page,
-}) => {
+test('root redirects to the login form without browser errors', async ({ page }) => {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
 
@@ -15,12 +13,12 @@ test('home page shows the warehouse app shell without browser errors', async ({
 
   await page.goto('/');
 
+  await expect(page).toHaveURL(/\/login$/);
   await expect(
-    page.getByRole('heading', { name: 'Warehouse Management System' }),
+    page.getByRole('heading', { name: 'Sign in to your workspace' }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'Inventory status' }),
-  ).toBeVisible();
+  await expect(page.getByLabel('Username')).toBeVisible();
+  await expect(page.getByLabel('Password')).toBeVisible();
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
